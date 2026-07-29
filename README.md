@@ -9,4 +9,4 @@ contribute by shihalex
 
 更多專案介紹：https://www.canva.com/design/DAG95d9oV84/b1WGsgzXtRUoGgyQ_RbdpQ/edit?utm_content=DAG95d9oV84&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
 
-專案成果報告：https://docs.google.com/document/d/1CywELNZ378dXS4BYjFBJ0GZz5Vv94A5Lh_hWSc274Ek/edit?usp=sharing
+專案成果報告：https://docs.google.com/document/d/10hZ0-rpSR7LnCaz_K20oTrRTM3ifEL1O/edit?usp=sharing&ouid=117538600936579205022&rtpof=true&sd=true
