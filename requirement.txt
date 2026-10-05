@@ -1,0 +1,27 @@
+# Python 3.11
+# Core numerical/data processing
+numpy==1.26.1
+pandas>=2.1,<3.0
+
+# Computer vision / object detection
+opencv-python>=4.8,<5.0
+ultralytics>=8.3,<9.0
+tqdm>=4.66,<5.0
+
+# PyTorch versions aligned with the official VGGT requirements
+# If your CUDA setup requires a different PyTorch build, install the
+# appropriate torch/torchvision wheels for your system first.
+torch==2.3.1
+torchvision==0.18.1
+
+# VGGT runtime dependencies
+Pillow>=10.0
+huggingface_hub>=0.23
+einops>=0.7
+safetensors>=0.4
+scipy>=1.11
+trimesh>=4.0
+
+# COLMAP / geospatial processing used by utils/vggt/bash.sh
+pycolmap>=3.11
+pyproj>=3.6
