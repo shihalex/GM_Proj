@@ -1,4 +1,4 @@
-# Road Sign Detection, Geolocation, and Automated Map Updating
+# 基於 YOLOv13 與 VGGT 之道路標誌辨識、三維定位與自動化圖資建置研究
 
 ## Demo Videos
 
@@ -10,22 +10,80 @@
 
 ---
 
-## Overview
+## System Workflow
 
-This project implements an end-to-end road-sign processing pipeline that combines video preprocessing, NMEA/GNSS parsing, YOLO-based road-sign detection and tracking, GNSS interpolation, image filtering, VGGT-based 3D reconstruction, COLMAP alignment, ray intersection, and final result export.
+![System Workflow](./README_Assets/System_Flow.png)
 
-The pipeline is designed for road-sign mapping from forward-facing road video and GNSS/NMEA data. It performs the following major stages:
+---
 
-1. Merge temporally continuous video/NMEA segments into trips.
-2. Convert NMEA records into CSV GNSS data.
-3. Detect and track road signs with a trained YOLO model and BoT-SORT.
-4. Match GNSS observations to video frames and interpolate coordinates.
-5. Remove highly similar sign images using optical flow.
-6. Downsample each sign track to at most 20 representative images.
-7. Convert the retained data into the directory/data format required by VGGT.
-8. Reconstruct each sign scene with VGGT and align the reconstruction to GNSS using COLMAP.
-9. Estimate road-sign coordinates through multi-view ray intersection.
-10. Merge all reconstructed sign results and export data for the web project.
+## Reports
+
+- **Refined Project Report:**  
+  https://docs.google.com/document/d/1zI8z4V9iFjIFXypButmdUuZE3iyr54Gn/edit?usp=sharing&ouid=117955251427297857157&rtpof=true&sd=true
+
+- **Full Project Report:**  
+  https://docs.google.com/document/d/1JDLs_wOmxxOEWwdIgnsEIZhr3Kaqqhct/edit?usp=sharing&ouid=117955251427297857157&rtpof=true&sd=true
+
+---
+
+## Project Overview
+
+This project develops an end-to-end pipeline for **road-sign detection, multi-view 3D reconstruction, geolocation, and automated map-data construction** from forward-facing road video and GNSS/NMEA data.
+
+The system first detects and tracks road signs using **YOLOv13** and **BoT-SORT**, then associates each sign track with synchronized GNSS observations. Redundant frames are removed with optical-flow-based filtering, and representative multi-view images are selected for 3D reconstruction. **VGGT** is used to estimate scene geometry and camera poses, followed by **COLMAP Bundle Adjustment** to refine the reconstruction. The local 3D model is aligned to the **ECEF** coordinate system using GNSS information, and each road-sign position is estimated through **multi-view ray intersection / forward intersection**. The final WGS84 coordinates and sign information are exported for visualization on a web-based map.
+
+### Main Technologies
+
+- **YOLOv13** — road-sign detection
+- **BoT-SORT** — multi-object tracking and cross-frame sign association
+- **GNSS / NMEA** — frame-level geographic reference
+- **Optical Flow** — redundant-frame filtering
+- **VGGT** — multi-view 3D reconstruction and camera-pose estimation
+- **COLMAP / Bundle Adjustment** — reconstruction refinement and GNSS alignment
+- **Multi-view Forward Intersection** — road-sign 3D position estimation
+- **WGS84 / ECEF** — geographic coordinate transformation
+- **OpenStreetMap / GitHub Pages** — result visualization and map-data presentation
+
+### Processing Pipeline
+
+```text
+Road Video + NMEA/GNSS
+        │
+        ▼
+Video/NMEA Preprocessing
+        │
+        ▼
+YOLOv13 Detection + BoT-SORT Tracking
+        │
+        ▼
+GNSS Synchronization and Interpolation
+        │
+        ▼
+Track Filtering + Optical-Flow Redundancy Removal
+        │
+        ▼
+Representative Multi-view Image Selection
+        │
+        ▼
+VGGT 3D Reconstruction
+        │
+        ▼
+COLMAP Bundle Adjustment
+        │
+        ▼
+GNSS Alignment to ECEF
+        │
+        ▼
+Multi-view Ray / Forward Intersection
+        │
+        ▼
+WGS84 Road-sign Coordinates
+        │
+        ▼
+Result Database + Web Map Visualization
+```
+
+---
 
 ## Repository Structure
 
@@ -34,6 +92,8 @@ GM_Proj/
 ├── Demo_Video/
 │   ├── Detection_Demo.mp4
 │   └── System_Demo.mp4
+├── README_Assets/
+│   └── System_Flow.png
 ├── Models/
 │   ├── best.pt
 │   └── botsort.yaml
@@ -58,36 +118,36 @@ GM_Proj/
 └── README.md
 ```
 
-All project scripts use relative paths such as `./Original_Videos/`, `./Processed_Videos/`, and `./Models/`. **Run all commands from the repository root** unless you intentionally modify these paths.
+All project scripts use relative paths such as `./Original_Videos/`, `./Processed_Videos/`, and `./Models/`. Run all commands from the **repository root** unless these paths are intentionally modified.
 
 ---
 
-## Script Descriptions
+## Code Functions
 
 | Script | Function |
 | --- | --- |
 | `utils/video_process/video_combine.py` | Groups temporally continuous front-camera video and NMEA segments into individual trips, merges MP4 files with FFmpeg, and concatenates NMEA records. |
-| `utils/video_process/nmea2csv.py` | Parses each merged NMEA file, converts UTC timestamps to UTC+8, converts NMEA coordinates to decimal degrees, and exports trip-level GNSS CSV files. |
-| `utils/object_process/object_detection.py` | Runs YOLO road-sign detection and BoT-SORT tracking, stores sign-track images, creates `detect.csv`/`detect.mp4`, and matches GNSS observations to the nearest frames. |
+| `utils/video_process/nmea2csv.py` | Parses merged NMEA files, converts timestamps to UTC+8, converts NMEA coordinates to decimal degrees, and exports trip-level GNSS CSV files. |
+| `utils/object_process/object_detection.py` | Runs YOLOv13 road-sign detection and BoT-SORT tracking, stores per-track sign images, generates `detect.csv` / `detect.mp4`, and associates GNSS observations with video frames. |
 | `utils/object_process/object_getlatlon.py` | Marks original GNSS observations and linearly interpolates longitude/latitude between valid GNSS anchor frames. |
-| `utils/object_process/object_clean.py` | Removes highly similar sign images using FAST features and Lucas-Kanade optical flow; sign folders with fewer than 10 images after cleaning are removed. |
-| `utils/object_process/object_upload.py` | Limits each retained sign track to at most 20 images, preserving the first and last frames and uniformly sampling intermediate frames, then copies `detect.csv` and sign folders into `Processed_Videos/Upload/`. |
-| `utils/object_process/prepare_vggt.py` | Converts each retained trip/sign into the VGGT scene format (`images/` + `data.csv`) without changing trip, sign, or image filenames. |
-| `utils/vggt/bash.sh` | Runs VGGT reconstruction with bundle adjustment, creates a COLMAP sparse model, aligns it to GNSS, performs multi-view ray intersection, and writes per-sign geolocation/error results. |
-| `utils/upload_process/combine_data.py` | Collects completed VGGT sign scenes, combines `marker_gnss_ray.csv` results, adds trip/sign metadata, and copies one representative image per sign. |
+| `utils/object_process/object_clean.py` | Removes highly similar sign images using FAST features and Lucas-Kanade optical flow; tracks with insufficient retained observations are discarded. |
+| `utils/object_process/object_upload.py` | Limits each retained sign track to at most 20 representative images while preserving the first and last frames and uniformly sampling intermediate frames. |
+| `utils/object_process/prepare_vggt.py` | Converts each retained sign track into the directory and metadata format required by VGGT. |
+| `utils/vggt/bash.sh` | Runs VGGT reconstruction, COLMAP Bundle Adjustment, GNSS alignment, multi-view ray intersection, and per-sign geolocation/error export. |
+| `utils/upload_process/combine_data.py` | Combines completed sign-scene results, adds trip/sign metadata, and copies one representative image per sign. |
 | `utils/upload_process/write_data.py` | Converts the combined result CSV into `data.json` and copies representative images into the web-data directory. |
 
 ---
 
-## Requirements
+## Environment Setup
 
 ### Platform
 
-The current workflow is intended for Linux because it uses Bash, FFmpeg/FFprobe, the COLMAP command-line interface, and CUDA-enabled deep-learning tools.
+The current workflow is intended for **Linux** because it uses Bash, FFmpeg/FFprobe, COLMAP, and CUDA-enabled deep-learning tools.
 
-A CUDA-capable NVIDIA GPU is strongly recommended for YOLO and VGGT.
+A CUDA-capable NVIDIA GPU is strongly recommended for YOLOv13 and VGGT.
 
-### Conda Environment
+### Python Environment
 
 The project was developed with **Python 3.11**.
 
@@ -98,18 +158,16 @@ python -m pip install --upgrade pip
 pip install -r requirement.txt
 ```
 
-The included `requirement.txt` contains the Python packages used directly by the project and the packages required by the VGGT/COLMAP processing stage.
-
 ### System Dependencies
 
-Install Git, FFmpeg/FFprobe, and COLMAP before running the pipeline. On Ubuntu/Debian systems:
+On Ubuntu/Debian:
 
 ```bash
 sudo apt update
 sudo apt install -y git ffmpeg colmap
 ```
 
-Verify the commands are available:
+Verify the required commands:
 
 ```bash
 git --version
@@ -118,13 +176,13 @@ ffprobe -version
 colmap -h
 ```
 
-> PyTorch/CUDA compatibility depends on the installed NVIDIA driver and CUDA environment. If the PyTorch build in `requirement.txt` does not match your system, install the appropriate PyTorch build for your CUDA setup before running the GPU stages.
+> PyTorch/CUDA compatibility depends on the installed NVIDIA driver and CUDA environment. If the PyTorch build in `requirement.txt` does not match the local CUDA setup, install a compatible PyTorch build before running GPU stages.
 
 ---
 
 ## Model Files
 
-The object-detection stage expects:
+Place the trained detector and tracker configuration under:
 
 ```text
 Models/
@@ -132,14 +190,19 @@ Models/
 └── botsort.yaml
 ```
 
-- `best.pt`: trained road-sign YOLO weights.
-- `botsort.yaml`: BoT-SORT tracker configuration.
+- `best.pt`: trained YOLOv13 road-sign detection weights
+- `botsort.yaml`: BoT-SORT tracker configuration
 
-`object_detection.py` reads these files through the relative paths `./Models/best.pt` and `./Models/botsort.yaml`.
+The detection script reads these files from:
+
+```text
+./Models/best.pt
+./Models/botsort.yaml
+```
 
 ---
 
-## Input Data Format
+## Input Data
 
 Place the original forward-camera video and NMEA files under:
 
@@ -156,32 +219,28 @@ Original_Videos/
         └── ...
 ```
 
-The filename pattern is:
+Expected filename format:
 
 ```text
 <event><YYMMDD>-<HHMMSS><camera>.<extension>
 ```
 
-For this pipeline, use `FILE` as the event prefix and `F` as the front-camera suffix, for example:
+For the current pipeline:
 
 ```text
 FILE250101-120000F.mp4
 FILE250101-120000F.nmea
 ```
 
-Using the `FILE` prefix is important because downstream scripts process trip directories in the form:
-
-```text
-FILEYYMMDD-HHMMSS
-```
+Use `FILE` as the event prefix and `F` as the front-camera suffix because downstream scripts preserve the `FILEYYMMDD-HHMMSS` trip naming convention.
 
 Video segments separated by no more than 30 seconds are grouped into the same trip by `video_combine.py`.
 
 ---
 
-## Execution Order
+## Execution Steps
 
-The commands below are intended to be copied and executed from the **repository root**.
+Run the following commands from the **repository root**.
 
 ### 1. Combine video and NMEA segments
 
@@ -189,7 +248,7 @@ The commands below are intended to be copied and executed from the **repository 
 python utils/video_process/video_combine.py
 ```
 
-Output examples:
+Example output:
 
 ```text
 Processed_Videos/
@@ -204,47 +263,51 @@ Processed_Videos/
 python utils/video_process/nmea2csv.py
 ```
 
-This creates a trip-level CSV beside the merged NMEA file.
+A trip-level GNSS CSV is generated beside the merged NMEA file.
 
-### 3. Run road-sign detection and tracking
+### 3. Run YOLOv13 detection and BoT-SORT tracking
 
 ```bash
 python utils/object_process/object_detection.py
 ```
 
-Major outputs are stored under each trip's `frames/` directory, including `detect.csv`, `detect.mp4`, and per-track sign folders.
+Major outputs include:
 
-### 4. Interpolate GNSS coordinates
+- `detect.csv`
+- `detect.mp4`
+- per-track sign image folders
+
+### 4. Interpolate frame-level GNSS coordinates
 
 ```bash
 python utils/object_process/object_getlatlon.py
 ```
 
-This adds the `Original` marker to original GNSS observations and linearly interpolates valid coordinates between GNSS anchor frames.
+The script marks original GNSS observations and linearly interpolates coordinates between neighboring GNSS anchor frames.
 
-### 5. Remove highly similar sign images
+### 5. Remove redundant sign images
 
 ```bash
 python utils/object_process/object_clean.py
 ```
 
-A sign track is retained only if at least 10 images remain after similarity filtering.
+Highly similar frames are removed using optical flow. Tracks with fewer than 10 retained images are discarded.
 
-### 6. Prepare retained sign tracks for upload/VGGT conversion
+### 6. Select representative multi-view images
 
 ```bash
 python utils/object_process/object_upload.py
 ```
 
-Each sign folder is limited to at most 20 images. The trip/sign naming structure and original image filenames are preserved.
+Each retained track is reduced to at most 20 representative images while preserving the first and last frames.
 
-### 7. Convert the retained data into VGGT scene format
+### 7. Convert retained tracks to VGGT scene format
 
 ```bash
 python utils/object_process/prepare_vggt.py
 ```
 
-The resulting structure is written under:
+Output structure:
 
 ```text
 Processed_Videos/Uploaded/
@@ -257,55 +320,60 @@ Processed_Videos/Uploaded/
 
 ---
 
-## Install VGGT Before the Reconstruction Stage
+## Install VGGT
 
-Before running `bash.sh`, clone the official VGGT repository from Meta/Facebook Research:
+Clone the official VGGT repository:
 
 ```bash
 git clone https://github.com/facebookresearch/vggt.git VGGT
 ```
 
-Install VGGT as an editable local package:
+Install it as an editable local package:
 
 ```bash
 pip install -e ./VGGT
 ```
 
-The official VGGT repository provides `demo_colmap.py`, which is used by this project's reconstruction script. The current `bash.sh` calls `python demo_colmap.py` from the repository root, so create a symbolic link:
+The current reconstruction workflow uses VGGT's `demo_colmap.py`. Create a symbolic link in the repository root:
 
 ```bash
 ln -sf VGGT/demo_colmap.py ./demo_colmap.py
 ```
 
-Confirm that it can be resolved:
+Verify the script:
 
 ```bash
 python demo_colmap.py --help
 ```
 
-VGGT's official `demo_colmap.py` expects each scene to contain an `images/` directory. `prepare_vggt.py` creates exactly this structure before reconstruction.
-
-Official VGGT repository: <https://github.com/facebookresearch/vggt>
-
 ---
 
-### 8. Run VGGT + COLMAP alignment + ray intersection
+## 8. Run VGGT Reconstruction and Geolocation
 
-Make the script executable once:
+Make the reconstruction script executable:
 
 ```bash
 chmod +x utils/vggt/bash.sh
 ```
 
-Then run:
+Run:
 
 ```bash
 bash utils/vggt/bash.sh
 ```
 
-For every trip/sign scene, the script attempts VGGT + bundle adjustment with `max_query_pts=4096`, retries with `2048` if necessary, aligns the COLMAP model to GNSS coordinates, and estimates the road-sign position using ray intersection.
+For each sign scene, the script:
 
-Successful scenes are recorded in:
+1. runs VGGT reconstruction,
+2. performs Bundle Adjustment,
+3. converts the reconstruction into COLMAP format,
+4. aligns the model to GNSS in ECEF coordinates,
+5. performs multi-view ray intersection,
+6. exports the estimated road-sign position and geometric residuals.
+
+The script first attempts VGGT + BA with `max_query_pts=4096` and retries with `2048` when necessary.
+
+Completed scenes are recorded in:
 
 ```text
 Processed_Videos/Uploaded/finish.txt
@@ -317,7 +385,7 @@ Failed scenes are recorded in:
 Processed_Videos/Uploaded/error.txt
 ```
 
-Representative per-scene outputs include:
+Representative outputs include:
 
 ```text
 marker_gnss_ray.csv
@@ -326,7 +394,9 @@ sparse/
 sparse_aligned/
 ```
 
-### 9. Combine all completed scene results
+---
+
+## 9. Combine Completed Geolocation Results
 
 ```bash
 python utils/upload_process/combine_data.py
@@ -340,15 +410,15 @@ Processed_Videos/Result/
 └── images/
 ```
 
-The combined CSV uses `scene_id` in the form:
+Each sign scene is identified by a unique `scene_id`, for example:
 
 ```text
 FILE250101-120000/1_SignClass
 ```
 
-to uniquely identify a sign scene across trips.
+---
 
-### 10. Generate web data
+## 10. Generate Web Visualization Data
 
 ```bash
 python utils/upload_process/write_data.py
@@ -362,11 +432,11 @@ Processed_Videos/GM_Proj_Web/
 └── images/
 ```
 
+The generated data can then be used by the web visualization project to display road-sign classes and estimated WGS84 locations on the map.
+
 ---
 
 ## Complete Copy-and-Run Workflow
-
-After placing the input files and model files in the expected locations, the processing stages can be executed in this order:
 
 ```bash
 # Create and activate the environment
@@ -375,25 +445,27 @@ conda activate gm_proj
 python -m pip install --upgrade pip
 pip install -r requirement.txt
 
-# System preprocessing and object-processing pipeline
+# Preprocess video and GNSS data
 python utils/video_process/video_combine.py
 python utils/video_process/nmea2csv.py
+
+# Road-sign detection and tracking
 python utils/object_process/object_detection.py
 python utils/object_process/object_getlatlon.py
 python utils/object_process/object_clean.py
 python utils/object_process/object_upload.py
 python utils/object_process/prepare_vggt.py
 
-# Clone and install official VGGT before reconstruction
+# Install VGGT
 git clone https://github.com/facebookresearch/vggt.git VGGT
 pip install -e ./VGGT
 ln -sf VGGT/demo_colmap.py ./demo_colmap.py
 
-# VGGT reconstruction, GNSS alignment, and ray intersection
+# 3D reconstruction, GNSS alignment, and road-sign positioning
 chmod +x utils/vggt/bash.sh
 bash utils/vggt/bash.sh
 
-# Merge results and generate web data
+# Combine results and generate web data
 python utils/upload_process/combine_data.py
 python utils/upload_process/write_data.py
 ```
@@ -402,7 +474,7 @@ python utils/upload_process/write_data.py
 
 ## Processing State Files
 
-The pipeline records completed work so that subsequent executions can skip already processed items:
+The pipeline records completed processing stages so repeated executions can skip already processed trips/scenes:
 
 ```text
 Processed_Videos/video_combine.txt
@@ -415,19 +487,19 @@ Processed_Videos/Uploaded/finish.txt
 Processed_Videos/Uploaded/error.txt
 ```
 
-Deleting one of these files allows the corresponding stage to reconsider previously processed trips/scenes, but do this carefully because some stages also modify or delete intermediate files.
+Deleting one of these files allows the corresponding stage to reconsider previously processed data, but use this carefully because some stages modify or remove intermediate files.
 
 ---
 
 ## Notes
 
-- Run commands from the repository root because the current scripts use relative filesystem paths.
-- The `FILEYYMMDD-HHMMSS` trip naming convention should be preserved across all processing stages.
-- `object_clean.py` may permanently remove redundant images and sign folders from the processed trip data.
-- `object_upload.py` may reduce retained sign tracks to at most 20 images.
-- `prepare_vggt.py` builds the VGGT-ready copy under `Processed_Videos/Uploaded/`; VGGT outputs are also stored in each corresponding sign scene.
+- Run all commands from the repository root because the scripts use relative paths.
+- Preserve the `FILEYYMMDD-HHMMSS` trip naming convention.
+- `object_clean.py` may permanently remove redundant images and insufficient sign tracks from processed data.
+- `object_upload.py` limits retained tracks to at most 20 representative images.
+- `prepare_vggt.py` creates the VGGT-ready copy under `Processed_Videos/Uploaded/`.
 - `bash.sh` requires both the Python `pycolmap` package and the system `colmap` executable.
-- The VGGT model weights may be downloaded automatically by the official VGGT code on first use, so an Internet connection may be required during the first reconstruction.
+- VGGT model weights may be downloaded automatically on first use, so an Internet connection may be required during the first reconstruction.
 
 ---
 
@@ -435,7 +507,7 @@ Deleting one of these files allows the corresponding stage to reconsider previou
 
 This project uses or integrates with:
 
-- [Ultralytics](https://github.com/ultralytics/ultralytics) for YOLO inference/tracking APIs.
-- [VGGT](https://github.com/facebookresearch/vggt) for multi-view 3D reconstruction.
-- [COLMAP](https://colmap.github.io/) for model alignment and reconstruction utilities.
-- FFmpeg/FFprobe for video concatenation and metadata inspection.
+- [Ultralytics](https://github.com/ultralytics/ultralytics) — YOLO inference and tracking APIs
+- [VGGT](https://github.com/facebookresearch/vggt) — multi-view 3D reconstruction
+- [COLMAP](https://colmap.github.io/) — bundle adjustment, model conversion, and alignment utilities
+- **FFmpeg / FFprobe** — video concatenation and metadata inspection
