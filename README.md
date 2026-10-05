@@ -3,10 +3,12 @@
 ## Demo Videos
 
 ### Detection Demo
-[▶ Watch `Detection_Demo.mp4`](./Demo_Video/Detection_Demo.mp4)
+
+https://github.com/user-attachments/assets/516bfefa-6bf9-4892-81b2-94926fc30bef
 
 ### System Demo
-[▶ Watch `System_Demo.mp4`](./Demo_Video/System_Demo.mp4)
+
+https://github.com/user-attachments/assets/258b78ab-e71a-4f57-989f-1053cc44d3bc
 
 ---
 
